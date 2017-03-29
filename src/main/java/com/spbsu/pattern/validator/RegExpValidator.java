@@ -4,27 +4,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Created by Sergey Afonin on 27.03.2017.
  */
 public class RegExpValidator implements Validator {
 
-    private ThreadLocal<List<Matcher>> matchers = new ThreadLocal<>();
+    private List<Pattern> patternList;
 
     public RegExpValidator() {
         List<String> patterns = RegExpReader.readPatterns(RegExpReader.getRegExp());
-        matchers.set(new ArrayList<>(patterns.size()));
-        for (String pattern : patterns) {
-            Matcher matcher = Pattern.compile(pattern).matcher("");
-            matchers.get().add(matcher);
-        }
+        patternList = patterns.stream().map(Pattern::compile).collect(Collectors.toList());
     }
 
     @Override
     public boolean validate(String s) {
-        for (Matcher matcher : matchers.get()) {
-            if (matcher.reset(s).matches())
+        for (Pattern pattern : patternList) {
+            if (pattern.matcher(s).matches())
                 return true;
         }
         return false;
