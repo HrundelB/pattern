@@ -14,7 +14,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 
@@ -27,8 +30,8 @@ public class ServiceTest {
 
     @Test
     public void test() throws IOException {
+        List<String> patterns = Files.readAllLines(Paths.get("src/main/resources/patterns.txt"));
         Gson gson = new Gson();
-        String pattern = "Отчет по принятым заявкам IPTV Всего %w+";
         List<String> jsons = new ArrayList<>();
         HashMap<String, Boolean> answers = new HashMap<>();
         Random random = new Random();
@@ -43,11 +46,12 @@ public class ServiceTest {
                     s.append(c);
             }
             String randomString = s.toString();
+            String pattern = patterns.get(random.nextInt(patterns.size()));
             StringBuilder result = new StringBuilder(pattern.replace("%w+", randomString));
             Boolean answer;
             if (random.nextBoolean()) {
                 int position = random.nextInt(pattern.length() - 10) + 5;
-                result.insert(position, randomString);
+                result.insert(position, "¶@¢ڴ");
                 answer = false;
             } else {
                 answer = true;
@@ -61,12 +65,13 @@ public class ServiceTest {
         }
 
         long start = System.currentTimeMillis();
-        final List<HttpResponse> responses = new ArrayList<>(jsons.size());
-        jsons.stream().parallel().forEach(json-> doRequest(responses, json));
+        final Map<HttpResponse, String> map = new ConcurrentHashMap<>();
+        jsons.stream().parallel().forEach(json -> doRequest(map, json));
         long finish = System.currentTimeMillis();
-        System.out.println("Takes: " + (finish - start) + " ms");
+        System.out.println(String.format("Jsons size: %s, Responses size: %s", jsons.size(), map.size()));
+        System.out.println(String.format("Takes: %s ms", finish - start));
 
-        for (HttpResponse response : responses) {
+        for (HttpResponse response : map.keySet()) {
             String s = readResponseToString(response);
             JsonParser parser = new JsonParser();
             JsonObject obj = parser.parse(s).getAsJsonObject();
@@ -76,7 +81,7 @@ public class ServiceTest {
         }
     }
 
-    private void doRequest(List<HttpResponse> responses, String json) {
+    private void doRequest(Map<HttpResponse, String> responses, String json) {
         HttpResponse response = null;
         try {
             response = Request.Post(URL).bodyString(json, ContentType.APPLICATION_JSON)
@@ -84,7 +89,7 @@ public class ServiceTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        responses.add(response);
+        responses.put(response, json);
     }
 
     private static String readResponseToString(HttpResponse response) throws IOException {
